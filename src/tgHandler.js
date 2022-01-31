@@ -34,10 +34,13 @@ const STATE_HANDLERS = {
         const message = tgh.getTextFromUpdate(update);
 
         if (message.startsWith('/drop_')) {  ///FIXME
-            const id = getParameterFromContainingUpdate(update);
+            const date = getParameterFromContainingUpdate(update).replace(/o/g, '-').replace(/u/g, ':').replace('x', '.');
 
             const measurementDoc = await db.measurements.findOne({
-                selector: { id }
+                selector: {
+                    date,
+                    userId: tgh.getChatIdFromUpdate(update)
+                }
             }).exec();
             await measurementDoc.remove();
 
@@ -86,7 +89,13 @@ const STATE_HANDLERS = {
 
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
-            'Ваши измерения::\n' + measurements.map(m => `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${m.id}`).join('\n')
+            'Ваши измерения::\n' + measurements
+                .map(m => {
+                    const date_cmd = m.date.replace(/-/g, 'o').replace(/:/g, 'u').replace('.', 'x');
+
+                    return `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${date_cmd}`
+                })
+                .join('\n')
         );
 
         await user.update({
