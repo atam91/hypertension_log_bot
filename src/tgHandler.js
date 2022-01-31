@@ -26,7 +26,7 @@ const STATE_HANDLERS = {
     echo: (telegramBot) => async ({ update }) => {
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
-            tgh.getTextFromUpdate(update)
+            tgh.getTextFromUpdate(update) + ' ' + tgh.getTextFromUpdate(update)
         );
     },
 };
