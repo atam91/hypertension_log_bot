@@ -86,7 +86,7 @@ const STATE_HANDLERS = {
 
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
-            'Ваши измерения::\n' + measurements.map(m => `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${m.id}`)
+            'Ваши измерения::\n' + measurements.map(m => `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${m.id}`).join('\n')
         );
 
         await user.update({
