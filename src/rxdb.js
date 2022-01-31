@@ -7,60 +7,40 @@ addPouchPlugin(require('pouchdb-adapter-leveldb')); // leveldown adapters need t
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 const USERS_SCHEMA = {
     title: "users schema",
-    version: 4,
+    version: 1,
     description: "users",
     primaryKey: "id",
     type: "object",
     properties: {
         id: { type: "string" },
         userId: { type: "number" },
-        favoriteStations: {
-            type: "array",
-            items: { type: "string" },
-        },
         state: "string",
-        filters: {
-            type: "object",
-            properties: {
-                denyTransportType: {
-                    type: "array",
-                    items: { type: "string" },
-                },
-                geolocation: {
-                    type: "object",
-                    properties: {
-                        latitude: { type: "number" },
-                        longitude: { type: "number" },
-                        radius: { type: "number" },
-                        messageId: { type: "number" },
-                    },
-                },
-            },
-        },
-        routes: {
-            type: "array",
-            items: {
-                type: "object",
-                properties: {
-                    id: 'string',
-                    name: 'string',
-                    stations: {
-                        type: 'array',
-                        items: { type: "string" },
-                    },
-                },
-            },
-        },
     },
     required: [ "id", "userId", ],
+};
+
+const MEASUREMENTS_SCHEMA = {
+    title: "MEASUREMENTS_SCHEMA schema",
+    version: 2,
+    description: "measurements",
+    primaryKey: "id",
+    type: "object",
+    properties: {
+        id: { type: "string" },
+        userId: { type: "number" },
+        pressureUp: { type: "number" },
+        pressureLow: { type: "number" },
+        pulse: { type: "number" },
+        messageId: { type: "number" },
+        date: { type: "string" }
+    },
+    required: [ "id", "userId", 'pressureUp', 'pressureLow' ],
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 let db = null;
 
 const initialize = async () => {
-    return; ///SIC!
-
     db = await createRxDatabase({
         name: './data/rxdb',
         storage: getRxStoragePouch(leveldown) // the full leveldown-module
@@ -71,9 +51,14 @@ const initialize = async () => {
             schema: USERS_SCHEMA,
             migrationStrategies: {
                 1: v => v, // silly
+            },
+        },
+
+        measurements: {
+            schema: MEASUREMENTS_SCHEMA,
+            migrationStrategies: {
+                1: v => v, // silly
                 2: v => v, // silly
-                3: v => v, // silly
-                4: v => Object.assign(v, { routes: [] }),
             },
         }
     });

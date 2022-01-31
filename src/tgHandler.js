@@ -29,14 +29,80 @@ const STATE_HANDLERS = {
             tgh.getTextFromUpdate(update) + ' ' + tgh.getTextFromUpdate(update)
         );
     },
+
+    default: (telegramBot) => async ({ update, user, db }) => {
+        const message = tgh.getTextFromUpdate(update);
+
+        if (message.startsWith('/drop_')) {  ///FIXME
+            const id = getParameterFromContainingUpdate(update);
+
+            const measurementDoc = await db.measurements.findOne({
+                selector: { id }
+            }).exec();
+            await measurementDoc.remove();
+
+            await telegramBot.sendMessage(
+                tgh.getChatIdFromUpdate(update),
+                'Удалил'
+            );
+
+            return;
+        }
+
+
+
+        const numberParts = message.split(/[ \-_\\\/]/).map(v => parseInt(v)).filter(v => v);
+        console.log('numberParts', numberParts);
+        if (numberParts.length === 2 || numberParts.length === 3) {
+            await db.measurements.insert({
+                id: update.update_id.toString(),
+                userId: tgh.getChatIdFromUpdate(update),
+
+                pressureUp: numberParts[0],
+                pressureLow: numberParts[1],
+                pulse: numberParts[2],
+                messageId: update.message.message_id,
+                date: (new Date).toISOString(),
+            });
+
+            await telegramBot.sendMessage(
+                tgh.getChatIdFromUpdate(update),
+                'Записал'
+            );
+        } else {
+            await telegramBot.sendMessage(
+                tgh.getChatIdFromUpdate(update),
+                'Давление это важно!\nПонятненько?! ::::)))\nПрисылай, будем вести журнал!\n\ngoogle Hypertension\n/get\\_measurements'
+            );
+        }
+    },
+
+    get_measurements: (telegramBot) => async ({ update, user, db }) => {
+        const measurements = await db.measurements.find({
+            selector: {
+                userId: tgh.getChatIdFromUpdate(update)
+            }
+        }).exec();
+
+        await telegramBot.sendMessage(
+            tgh.getChatIdFromUpdate(update),
+            'Ваши измерения::\n' + measurements.map(m => `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${m.id}`)
+        );
+
+        await user.update({
+            $set: {
+                state: 'default',
+            }
+        });
+    },
 };
 
 const handler = (telegramBot) => async (update) => {
-    ///const db = rxdb.getDb();
+    const db = rxdb.getDb();
 
     console.log('UPDATE', JSON.stringify(update, null, 4));
 
-    /* const user = await db.users.findOne({
+    const user = await db.users.findOne({
         selector: {
             userId: tgh.getChatIdFromUpdate(update)
         }
@@ -45,25 +111,17 @@ const handler = (telegramBot) => async (update) => {
         await db.users.insert({
             id: tgh.getChatIdFromUpdate(update).toString(),
             userId: tgh.getChatIdFromUpdate(update),
-            state: 'search',
+            state: 'default',
         })
     }
 
-    if (!user.get('state')) {                                               //// todo drop later
-        await user.update({
-            $set: {
-                'state': 'search',
-            }
-        });
-    } */
-
-    /* if (update.message.entities && update.message.entities[0].type === 'bot_command') {
+    if (update.message.entities && update.message.entities[0].type === 'bot_command') {
         const botCmdEntity = update.message.entities[0];
         const cmd = update.message.text.substr(botCmdEntity.offset + 1, botCmdEntity.length);
 
         console.log('CMD', cmd);
 
-        if (false && STATE_HANDLERS[cmd]) {
+        if (STATE_HANDLERS[cmd]) {
             await user.update({
                 $set: {
                     'state': cmd,
@@ -77,17 +135,15 @@ const handler = (telegramBot) => async (update) => {
 
     const [ state, ...userStateArgs ] = parseStateLine(userStateLine);
 
-    const handler = STATE_HANDLERS[state];
+    const handler = STATE_HANDLERS[state] || STATE_HANDLERS.default;
     if (handler) {
-        await handler(telegramBot)({ user, update }, ...userStateArgs);
+        await handler(telegramBot)({ user, update, db }, ...userStateArgs);
     } else {
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
             '⚠️ some state error ⚠️'
         );
-    }*/
-
-    await STATE_HANDLERS.echo(telegramBot)({ update });
+    }
 };
 
 
