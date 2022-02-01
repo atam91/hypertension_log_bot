@@ -1,5 +1,6 @@
-const { helpers: tgh } = require('./base/telegramBot');
 const rxdb = require('./rxdb');
+const { helpers: tgh } = require('./base/telegramBot');
+const { getAverage } = require('./base/utils');
 
 rxdb.initialize() /// fixme? not pretty
     .then(() => { console.log('rxdb initialized'); })
@@ -21,6 +22,8 @@ const getParameterFromContainingUpdate = update => tgh.getTextFromUpdate(update)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const measurementString = m => `${m.pressureUp}\/${m.pressureLow} *${m.pulse || '_'}*`;
 
 const STATE_HANDLERS = {
     echo: (telegramBot) => async ({ update }) => {
@@ -75,7 +78,15 @@ const STATE_HANDLERS = {
         } else {
             await telegramBot.sendMessage(
                 tgh.getChatIdFromUpdate(update),
-                'Давление это важно!\nПонятненько?! ::::)))\nПрисылай, будем вести журнал!\n\ngoogle Hypertension\n/get\\_measurements'
+                [
+                    'Давление это важно, Понятненько?!)',
+                    'Береги себя, раз уж ты здесь. Полезно немного последить за своим давлением, что бы знать свою норму.',
+                    'Присылай значения через пробел (`120 80 60`),\nбудем вести журнал!',
+                    '',
+                    'Измерения: /get\\_measurements',
+                    'Статистика: /get\\_statistics',
+                    'Информация: /get\\_information',
+                ].join('\n')
             );
         }
     },
@@ -93,9 +104,78 @@ const STATE_HANDLERS = {
                 .map(m => {
                     const date_cmd = m.date.replace(/-/g, 'o').replace(/:/g, 'u').replace('.', 'x');
 
-                    return `${m.pressureUp}\/${m.pressureLow} *${m.pulse}*   /drop\\_${date_cmd}`
+                    return `${measurementString(m)}   /drop\\_${date_cmd}`
                 })
                 .join('\n')
+        );
+
+        await user.update({
+            $set: {
+                state: 'default',
+            }
+        });
+    },
+
+    get_statistics: (telegramBot) => async ({ update, user, db }) => {
+        const measurements = await db.measurements.find({
+            selector: {
+                userId: tgh.getChatIdFromUpdate(update)
+            }
+        }).exec();
+
+        const averageMeasurement = {
+            pressureUp: getAverage( measurements.map(m => m.pressureUp) ),
+            pressureLow: getAverage( measurements.map(m => m.pressureLow) ),
+            pulse: getAverage( measurements.map(m => m.pulse).filter(v => v) ),
+        };
+
+        const measurementsExtremum = {
+            pressureUpMax: Math.max( ...measurements.map(m => m.pressureUp) ),
+            pressureLowMax: Math.max( ...measurements.map(m => m.pressureLow) ),
+            pressureLowMin: Math.min( ...measurements.map(m => m.pressureLow) ),
+            pressureUpMin: Math.min( ...measurements.map(m => m.pressureUp) ),
+            pulseMax: Math.max( ...measurements.map(m => m.pulse).filter(v => v) ),
+            pulseMin: Math.min( ...measurements.map(m => m.pulse).filter(v => v) ),
+        };
+
+        const measurementStringWithDate = m => measurementString(m) + `   \`${m.date}\``;
+
+        await telegramBot.sendMessage(
+            tgh.getChatIdFromUpdate(update),
+            [
+                'Статистика:',
+                `Замеров - ${measurements.length}`,
+                `Среднее значение - ${measurementString(averageMeasurement)}`,
+                '',
+                'Экстремизм:',
+                'upMax - ' + measurementStringWithDate( measurements.find(m => m.pressureUp === measurementsExtremum.pressureUpMax) ),
+                'lowMax - ' + measurementStringWithDate( measurements.find(m => m.pressureLow === measurementsExtremum.pressureLowMax) ),
+                'lowMin - ' + measurementStringWithDate( measurements.find(m => m.pressureLow === measurementsExtremum.pressureLowMin) ),
+                'upMin - ' + measurementStringWithDate( measurements.find(m => m.pressureUp === measurementsExtremum.pressureUpMin) ),
+                '',
+                'pulseMax - ' + measurementStringWithDate( measurements.find(m => m.pulse === measurementsExtremum.pulseMax) ),
+                'pulseMin - ' + measurementStringWithDate( measurements.find(m => m.pulse === measurementsExtremum.pulseMin) ),
+
+            ].join('\n')
+        );
+
+        await user.update({
+            $set: {
+                state: 'default',
+            }
+        });
+    },
+
+    get_information: (telegramBot) => async ({ update, user, db }) => {
+        await telegramBot.sendMessage(
+            tgh.getChatIdFromUpdate(update),
+            {
+                parseMode: 'HTML',
+                text: [
+                    'wiki:',
+                    'https://ru.wikipedia.org/wiki/Артериальная_гипертензия',
+                ].join('\n')
+            },
         );
 
         await user.update({

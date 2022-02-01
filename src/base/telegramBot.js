@@ -34,13 +34,14 @@ function TelegramBot (options = {}) {
 
     async function sendMessage(chatId, message) {
         const text = message.text || message;
+        const parseMode = message.parseMode || 'Markdown';
 
         const _sendMessage = text =>
             axios.post(
                 `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
                 {
                     chat_id: chatId,
-                    parse_mode: 'Markdown',
+                    parse_mode: parseMode,
                     text,
                     reply_to_message_id: message.replyToMessageId || null,
                     reply_markup: message.keyboard
@@ -137,7 +138,7 @@ function TelegramBot (options = {}) {
 
 
 
-const getChatIdFromUpdate = update => update.message.chat.id;
+const getChatIdFromUpdate = update => update.message && update.message.chat.id;
 
 const getTextFromUpdate = update => update.message && update.message.text;
 
