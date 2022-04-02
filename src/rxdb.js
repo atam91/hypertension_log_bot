@@ -7,7 +7,7 @@ addPouchPlugin(require('pouchdb-adapter-leveldb')); // leveldown adapters need t
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 const USERS_SCHEMA = {
     title: "users schema",
-    version: 1,
+    version: 2,
     description: "users",
     primaryKey: "id",
     type: "object",
@@ -15,18 +15,20 @@ const USERS_SCHEMA = {
         id: { type: "string" },
         userId: { type: "number" },
         state: "string",
+        lastMeasurementIndex: { type: "number" },
     },
     required: [ "id", "userId", ],
 };
 
 const MEASUREMENTS_SCHEMA = {
     title: "MEASUREMENTS_SCHEMA schema",
-    version: 2,
+    version: 3,
     description: "measurements",
     primaryKey: "id",
     type: "object",
     properties: {
         id: { type: "string" },
+        index: { type: "number" },
         userId: { type: "number" },
         pressureUp: { type: "number" },
         pressureLow: { type: "number" },
@@ -51,6 +53,7 @@ const initialize = async () => {
             schema: USERS_SCHEMA,
             migrationStrategies: {
                 1: v => v, // silly
+                2: v => v, // silly
             },
         },
 
@@ -59,6 +62,7 @@ const initialize = async () => {
             migrationStrategies: {
                 1: v => v, // silly
                 2: v => v, // silly
+                3: v => v, // silly
             },
         }
     });

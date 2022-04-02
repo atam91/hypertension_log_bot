@@ -1,6 +1,6 @@
 const rxdb = require('./rxdb');
 const { helpers: tgh } = require('./base/telegramBot');
-const { getAverage } = require('./base/utils');
+const { getAverage, getLast } = require('./base/utils');
 
 rxdb.initialize() /// fixme? not pretty
     .then(() => { console.log('rxdb initialized'); })
@@ -37,11 +37,11 @@ const STATE_HANDLERS = {
         const message = tgh.getTextFromUpdate(update);
 
         if (message.startsWith('/drop_')) {  ///FIXME
-            const date = getParameterFromContainingUpdate(update).replace(/o/g, '-').replace(/u/g, ':').replace('x', '.');
+            const index = getParameterFromContainingUpdate(update);
 
             const measurementDoc = await db.measurements.findOne({
                 selector: {
-                    date,
+                    index: parseInt(index),
                     userId: tgh.getChatIdFromUpdate(update)
                 }
             }).exec();
@@ -54,8 +54,58 @@ const STATE_HANDLERS = {
 
             return;
         }
+        if (message.startsWith('/show_')) {  ///FIXME
+            const index = getParameterFromContainingUpdate(update);
 
+            const measurement = await db.measurements.findOne({
+                selector: {
+                    index: parseInt(index),
+                    userId: tgh.getChatIdFromUpdate(update)
+                }
+            }).exec();
+            const m = measurement;
 
+            await telegramBot.sendMessage(
+                tgh.getChatIdFromUpdate(update),
+                measurement.toJSON()
+            );
+
+            await telegramBot.sendMessage(
+                tgh.getChatIdFromUpdate(update),
+                {
+                    text: [
+                        measurementString(m),
+                        '',
+                        `__${m.date}__`,
+                        '',
+                        `/drop\\_${m.index}`,
+                    ].join('\n'),
+                    replyToMessageId: m.messageId,
+                }
+            );
+
+            return;
+        }
+
+        //// FIXME TODO DROP
+        const measurements = await db.measurements.find({
+            selector: {
+                userId: tgh.getChatIdFromUpdate(update)
+            }
+        }).exec();
+
+        await Promise.all(
+            measurements.map((md, index) => md.update({ $set: { index } }))
+        );
+
+        const lm = getLast(measurements);
+        if (lm) {
+            await user.update({ $set: { lastMeasurementIndex: lm.index } });
+        }
+
+        //////console.log('___MEASUREMNTS', measurements.map(d => d.toJSON()));
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////
 
         const numberParts = message.split(/[ \-_\\\/]/).map(v => parseInt(v)).filter(v => v);
         console.log('numberParts', numberParts);
@@ -98,14 +148,12 @@ const STATE_HANDLERS = {
             }
         }).exec();
 
+        /////console.log('___MEASUREMNTS', measurements.map(d => d.toJSON()));
+
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
             'Ваши измерения::\n' + measurements
-                .map(m => {
-                    const date_cmd = m.date.replace(/-/g, 'o').replace(/:/g, 'u').replace('.', 'x');
-
-                    return `${measurementString(m)}   /drop\\_${date_cmd}`
-                })
+                .map(m => `${measurementString(m)}   /show\\_${m.index}`)
                 .join('\n')
         );
 
@@ -138,7 +186,7 @@ const STATE_HANDLERS = {
             pulseMin: Math.min( ...measurements.map(m => m.pulse).filter(v => v) ),
         };
 
-        const measurementStringWithDate = m => measurementString(m) + `   \`${m.date}\``;
+        const measurementStringWithDate = m => m && (measurementString(m) + `   \`${m.date}\``) || '~';
 
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
@@ -191,18 +239,20 @@ const handler = (telegramBot) => async (update) => {
 
     console.log('UPDATE', JSON.stringify(update, null, 4));
 
-    const user = await db.users.findOne({
+    let user = await db.users.findOne({
         selector: {
             userId: tgh.getChatIdFromUpdate(update)
         }
     }).exec();
     if (!user) {
-        await db.users.insert({
+        user = await db.users.insert({
             id: tgh.getChatIdFromUpdate(update).toString(),
             userId: tgh.getChatIdFromUpdate(update),
             state: 'default',
         })
     }
+
+    console.log('__User', user.toJSON());
 
     if (update.message.entities && update.message.entities[0].type === 'bot_command') {
         const botCmdEntity = update.message.entities[0];
