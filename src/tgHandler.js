@@ -20,6 +20,10 @@ const parseStateLine = function(line) {
 
 const getParameterFromContainingUpdate = update => tgh.getTextFromUpdate(update).split('_')[1];
 
+const parseDateFromUpdate = update => getParameterFromContainingUpdate(update).replace(/o/g, '-').replace(/u/g, ':').replace('x', '.');
+
+const serializeDate = date => date.replace(/-/g, 'o').replace(/:/g, 'u').replace('.', 'x');
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,11 +41,11 @@ const STATE_HANDLERS = {
         const message = tgh.getTextFromUpdate(update);
 
         if (message.startsWith('/drop_')) {  ///FIXME
-            const index = getParameterFromContainingUpdate(update);
+            const date = parseDateFromUpdate(update);
 
             const measurementDoc = await db.measurements.findOne({
                 selector: {
-                    index: parseInt(index),
+                    date,
                     userId: tgh.getChatIdFromUpdate(update)
                 }
             }).exec();
@@ -55,20 +59,15 @@ const STATE_HANDLERS = {
             return;
         }
         if (message.startsWith('/show_')) {  ///FIXME
-            const index = getParameterFromContainingUpdate(update);
+            const date = parseDateFromUpdate(update);
 
             const measurement = await db.measurements.findOne({
                 selector: {
-                    index: parseInt(index),
+                    date,
                     userId: tgh.getChatIdFromUpdate(update)
                 }
             }).exec();
             const m = measurement;
-
-            await telegramBot.sendMessage(
-                tgh.getChatIdFromUpdate(update),
-                measurement.toJSON()
-            );
 
             await telegramBot.sendMessage(
                 tgh.getChatIdFromUpdate(update),
@@ -78,7 +77,7 @@ const STATE_HANDLERS = {
                         '',
                         `__${m.date}__`,
                         '',
-                        `/drop\\_${m.index}`,
+                        `/drop\\_${serializeDate(m.date)}`,
                     ].join('\n'),
                     replyToMessageId: m.messageId,
                 }
@@ -153,7 +152,7 @@ const STATE_HANDLERS = {
         await telegramBot.sendMessage(
             tgh.getChatIdFromUpdate(update),
             'Ваши измерения::\n' + measurements
-                .map(m => `${measurementString(m)}   /show\\_${m.index}`)
+                .map(m => `${measurementString(m)}   /show\\_${serializeDate(m.date)}`)
                 .join('\n')
         );
 
