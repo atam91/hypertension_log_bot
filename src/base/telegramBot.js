@@ -140,7 +140,12 @@ function TelegramBot (options = {}) {
 
 const getChatIdFromUpdate = update => update.message && update.message.chat.id;
 
-const getTextFromUpdate = update => update.message && update.message.text;
+const getTextFromUpdate = (update, check = true) => {
+    const text = update.message && update.message.text;
+    if (check && (!text || typeof text !== 'string')) throw new Error('Could not get text from update');
+
+    return text;
+}
 
 
 module.exports = {

@@ -18,11 +18,17 @@ const parseStateLine = function(line) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const getParameterFromContainingUpdate = update => tgh.getTextFromUpdate(update).split('_')[1];
+const getParameterFromContainingUpdate = update => {
+    const text = tgh.getTextFromUpdate(update);
+    const match = text.match(/^([^_]+)_(.*)/);
+    if (!match) throw new Error('Could not get parameter from updateText ' + text);
 
-const parseDateFromUpdate = update => getParameterFromContainingUpdate(update).replace(/o/g, '-').replace(/u/g, ':').replace('x', '.');
+    return match[2];
+}
 
-const serializeDate = date => date.replace(/-/g, 'o').replace(/:/g, 'u').replace('.', 'x');
+const parseDateFromUpdate = update => getParameterFromContainingUpdate(update).replace(/_/g, '-').replace(/u/g, ':').replace('x', '.');
+
+const serializeDate = date => date.replace(/-/g, '\\_').replace(/:/g, 'u').replace('.', 'x');
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
